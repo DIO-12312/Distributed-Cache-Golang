@@ -24,7 +24,7 @@ type Value interface {
 }
 
 // 相当于简化struct的构造
-func NewCache(maxBytes int64, onEvicted func(key string, value Value)) *Cache {
+func NewCacheLru(maxBytes int64, onEvicted func(key string, value Value)) *Cache {
 	return &Cache{
 		maxBytes:   maxBytes,
 		ll:         list.New(),

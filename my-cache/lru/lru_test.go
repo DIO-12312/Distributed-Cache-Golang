@@ -14,7 +14,7 @@ func (s String) Len() int {
 
 // 测试 Add 和 Get 的正常使用
 func TestAddAndGet(t *testing.T) {
-	c := NewCache(1024, nil)
+	c := NewCacheLru(1024, nil)
 
 	// 添加一条记录并读取
 	c.Add("key1", String("hello"))
@@ -48,7 +48,7 @@ func TestRemoveOldestAndCallback(t *testing.T) {
 	// "k1" + "aa" = 2+2 = 4 字节
 	// "k2" + "bb" = 2+2 = 4 字节
 	// 总共 8 字节，maxBytes 设为 8
-	c := NewCache(8, onEvicted)
+	c := NewCacheLru(8, onEvicted)
 
 	c.Add("k1", String("aa")) // nowBytes = 4
 	c.Add("k2", String("bb")) // nowBytes = 8
