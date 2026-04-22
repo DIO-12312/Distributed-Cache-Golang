@@ -1,4 +1,4 @@
-package cachemutex
+package mycache
 
 import (
 	"fmt"
@@ -108,11 +108,14 @@ func TestCacheConcurrency(t *testing.T) {
 
 	// 验证数据完整性（随机检查几个）
 	//避免检查"key_0_0"这类早期数据，10KB的cache会导致早期数据被清除
-	got, ok := c.Get("key_8_88")
-	if !ok {
-		t.Errorf("expected to get value after concurrent writes")
-	}
-	if got.String() != "key_8_88" {
-		t.Errorf("data corruption: expected key_0_0, got %s", got.String())
+	for i := 0; i < 10; i++ {
+		key := fmt.Sprintf("key_5_%d", i)
+		got, ok := c.Get(key)
+		if !ok {
+			t.Errorf("expected to get value after concurrent writes")
+		}
+		if got.String() != key {
+			t.Errorf("data corruption: expected key_0_0, got %s", got.String())
+		}
 	}
 }

@@ -7,6 +7,12 @@ type ByteView struct {
 	b []byte
 }
 
+func NewByteView(data []byte) ByteView {
+	b := make([]byte, len(data))
+	copy(b, data)
+	return ByteView{b: b}
+}
+
 func (v ByteView) Len() int {
 	return len(v.b)
 }

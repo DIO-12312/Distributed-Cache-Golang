@@ -1,5 +1,5 @@
 // 实例化lru，对其封装一层互斥锁，并用饿汉模式，直到使用时才创建lru
-package cachemutex
+package mycache
 
 import (
 	"mycache/byteview"
@@ -29,6 +29,7 @@ func (c *cache) Get(key string) (value byteview.ByteView, ok bool) {
 func (c *cache) Add(key string, value byteview.ByteView) {
 	c.mutex.Lock()
 	defer c.mutex.Unlock()
+
 	if c.lru == nil {
 		c.lru = lru.NewCacheLru(c.cacheBytes, nil)
 	}
