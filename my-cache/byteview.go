@@ -1,4 +1,4 @@
-package byteview
+package mycache
 
 //对真正存储底层数据的b []byte进行封装，提供一个只读的拷贝切片给外部
 //实现真正的只读保护
@@ -18,8 +18,12 @@ func (v ByteView) Len() int {
 }
 
 func (v ByteView) ByteSlices() []byte {
-	res := make([]byte, len(v.b))
-	copy(res, v.b)
+	return cloneBytes(v.b)
+}
+
+func cloneBytes(bytes []byte) []byte {
+	res := make([]byte, len(bytes))
+	copy(res, bytes)
 	return res
 }
 

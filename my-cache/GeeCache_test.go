@@ -1,66 +1,67 @@
 package mycache
 
 import (
+	"fmt"
+	"log"
 	"reflect"
 	"testing"
 )
 
+var db = map[string]string{
+	"Tom":  "630",
+	"Jack": "589",
+	"Sam":  "567",
+}
+
 func TestGetter(t *testing.T) {
-	//f的类型写成接口getter而非具体实现GetterFunc的原因
-	//更灵活：可以自由转换成实现该接口的类型
-	//类似于其他的语言中基类指针指向子类
 	var f Getter = GetterFunc(func(key string) ([]byte, error) {
 		return []byte(key), nil
 	})
 
-	except := []byte("key")
-	//DeepEqual可以用于处理切片，map，结构体等复杂的内容的相等，以及nil不等于空切片
-	if v, _ := f.Get("key"); !reflect.DeepEqual(v, except) {
-		t.Fatal("Not Passing,call failed")
+	expect := []byte("key")
+	if v, _ := f.Get("key"); !reflect.DeepEqual(v, expect) {
+		t.Fatal("callback failed")
 	}
 }
 
-func TestNewGroup(t *testing.T) {
-	_, err := NewGroup("test", 32, nil)
-	if err == nil {
-		t.Fatal("getter not be nil")
+func TestGet(t *testing.T) {
+	loadCounts := make(map[string]int, len(db))
+	gee, _ := NewGroup("scores", 2<<10, GetterFunc(
+		func(key string) ([]byte, error) {
+			log.Println("[SlowDB] search key", key)
+			if v, ok := db[key]; ok {
+				if _, ok := loadCounts[key]; !ok {
+					loadCounts[key] = 0
+				}
+				loadCounts[key]++
+				return []byte(v), nil
+			}
+			return nil, fmt.Errorf("%s not exist", key)
+		}))
+
+	for k, v := range db {
+		if view, err := gee.Get(k); err != nil || view.String() != v {
+			t.Fatal("failed to get value of Tom")
+		}
+		if _, err := gee.Get(k); err != nil || loadCounts[k] > 1 {
+			t.Fatalf("cache %s miss", k)
+		}
 	}
 
+	if view, err := gee.Get("unknown"); err == nil {
+		t.Fatalf("the value of unknow should be empty, but %s got", view)
+	}
 }
 
 func TestGetGroup(t *testing.T) {
-	// 测试 1: 获取不存在的 Group，应该返回 nil 和 false
-	g, ok := GetGroup("non-existent")
-	if g != nil || ok {
-		t.Errorf("GetGroup non-existent: got group=%v ok=%v, want nil false", g, ok)
+	groupName := "scores"
+	NewGroup(groupName, 2<<10, GetterFunc(
+		func(key string) (bytes []byte, err error) { return }))
+	if group, _ := GetGroup(groupName); group == nil || group.name != groupName {
+		t.Fatalf("group %s not exist", groupName)
 	}
 
-	// 测试 2: 创建一个 Group，然后成功获取它
-	testGetter := GetterFunc(func(key string) ([]byte, error) {
-		return []byte(key), nil
-	})
-	createGroup, err := NewGroup("testGroup", 1024, testGetter)
-	if err != nil {
-		t.Fatalf("NewGroup failed: %v", err)
-	}
-	if createGroup == nil {
-		t.Fatal("NewGroup failed: returned nil")
-	}
-
-	// 测试 3: 获取已存在的 Group
-	retrievedGroup, ok := GetGroup("testGroup")
-	if !ok {
-		t.Error("GetGroup failed: should find 'testGroup' but got false")
-	}
-	if retrievedGroup == nil {
-		t.Error("GetGroup failed: returned nil for existing group")
-	}
-	if retrievedGroup.name != "testGroup" {
-		t.Errorf("GetGroup: got name=%s, want 'testGroup'", retrievedGroup.name)
-	}
-
-	// 测试 4: 验证返回的是同一个对象
-	if retrievedGroup != createGroup {
-		t.Error("GetGroup: returned different group object")
+	if group, _ := GetGroup(groupName + "111"); group != nil {
+		t.Fatalf("expect nil, but %s got", group.name)
 	}
 }

@@ -2,7 +2,6 @@ package mycache
 
 import (
 	"fmt"
-	"mycache/byteview"
 	"testing"
 )
 
@@ -11,11 +10,11 @@ func TestCacheAddAndGet(t *testing.T) {
 
 	// 测试 Add 和 Get
 	key := "key1"
-	value := byteview.NewByteView([]byte("value1"))
-	c.Add(key, value)
+	value := NewByteView([]byte("value1"))
+	c.add(key, value)
 
 	// 获取存在的键
-	got, ok := c.Get(key)
+	got, ok := c.get(key)
 	if !ok {
 		t.Errorf("expected to get value for key %s", key)
 	}
@@ -28,7 +27,7 @@ func TestCacheGetNotFound(t *testing.T) {
 	c := &cache{cacheBytes: 100}
 
 	// 测试获取不存在的键
-	got, ok := c.Get("nonexistent")
+	got, ok := c.get("nonexistent")
 	if ok {
 		t.Errorf("expected not to find key, but got %v", got)
 	}
@@ -48,12 +47,12 @@ func TestCacheMultipleKeys(t *testing.T) {
 	}
 
 	for _, tc := range testCases {
-		c.Add(tc.key, byteview.NewByteView([]byte(tc.value)))
+		c.add(tc.key, NewByteView([]byte(tc.value)))
 	}
 
 	// 验证所有键都能正确检索
 	for _, tc := range testCases {
-		got, ok := c.Get(tc.key)
+		got, ok := c.get(tc.key)
 		if !ok {
 			t.Errorf("expected to get value for key %s", tc.key)
 		}
@@ -67,19 +66,19 @@ func TestCacheUpdateValue(t *testing.T) {
 	c := &cache{cacheBytes: 100}
 
 	key := "key1"
-	value1 := byteview.NewByteView([]byte("value1"))
-	value2 := byteview.NewByteView([]byte("value2"))
+	value1 := NewByteView([]byte("value1"))
+	value2 := NewByteView([]byte("value2"))
 
 	// 添加初始值
-	c.Add(key, value1)
-	got1, _ := c.Get(key)
+	c.add(key, value1)
+	got1, _ := c.get(key)
 	if got1.String() != value1.String() {
 		t.Errorf("expected %s, got %s", value1.String(), got1.String())
 	}
 
 	// 更新值
-	c.Add(key, value2)
-	got2, _ := c.Get(key)
+	c.add(key, value2)
+	got2, _ := c.get(key)
 	if got2.String() != value2.String() {
 		t.Errorf("expected %s, got %s", value2.String(), got2.String())
 	}
@@ -94,8 +93,8 @@ func TestCacheConcurrency(t *testing.T) {
 		go func(id int) {
 			for j := 0; j < 100; j++ {
 				key := fmt.Sprintf("key_%d_%d", id, j)
-				value := byteview.NewByteView([]byte(key))
-				c.Add(key, value)
+				value := NewByteView([]byte(key))
+				c.add(key, value)
 			}
 			done <- true
 		}(i)
@@ -110,7 +109,7 @@ func TestCacheConcurrency(t *testing.T) {
 	//避免检查"key_0_0"这类早期数据，10KB的cache会导致早期数据被清除
 	for i := 0; i < 10; i++ {
 		key := fmt.Sprintf("key_5_%d", i)
-		got, ok := c.Get(key)
+		got, ok := c.get(key)
 		if !ok {
 			t.Errorf("expected to get value after concurrent writes")
 		}

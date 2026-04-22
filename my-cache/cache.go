@@ -2,7 +2,6 @@
 package mycache
 
 import (
-	"mycache/byteview"
 	"mycache/lru"
 	"sync"
 )
@@ -14,19 +13,19 @@ type cache struct {
 }
 
 // 懒汉模式实现函数
-func (c *cache) Get(key string) (value byteview.ByteView, ok bool) {
+func (c *cache) get(key string) (value ByteView, ok bool) {
 	c.mutex.Lock()
 	defer c.mutex.Unlock()
 	if c.lru == nil {
 		c.lru = lru.NewCacheLru(c.cacheBytes, nil)
 	}
 	if v, ok := c.lru.Get(key); ok {
-		return v.(byteview.ByteView), true
+		return v.(ByteView), true
 	}
 	return
 }
 
-func (c *cache) Add(key string, value byteview.ByteView) {
+func (c *cache) add(key string, value ByteView) {
 	c.mutex.Lock()
 	defer c.mutex.Unlock()
 

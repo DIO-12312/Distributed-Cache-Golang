@@ -3,6 +3,8 @@ package mycache
 
 import (
 	"errors"
+	"fmt"
+	"log"
 	"sync"
 )
 
@@ -26,6 +28,15 @@ func (f GetterFunc) Get(key string) ([]byte, error) {
 	- 隔离不同缓存 - 不同的业务数据用不同的 Group
     - 独立管理 - 每个 Group 有自己的容量、过期策略等
 	- 灵活扩展 - 后续可以为不同 Group 配置不同的分布式节点
+*/
+
+/*
+                            是
+接收 key --> 检查是否被缓存 -----> 返回缓存值 ⑴
+                |  否                         是
+                |-----> 是否应当从远程节点获取 -----> 与远程节点交互 --> 返回缓存值 ⑵
+                            |  否
+                            |-----> 调用`回调函数`，获取值并添加到缓存 --> 返回缓存值 ⑶
 */
 
 type Group struct {
@@ -63,4 +74,38 @@ func GetGroup(name string) (*Group, bool) {
 		return g, true
 	}
 	return nil, false
+}
+
+func (g *Group) Get(key string) (value ByteView, err error) {
+	if key == "" {
+		//不建议用errors.New()过于轻量化
+		return ByteView{}, fmt.Errorf("key must not nil")
+	}
+	if v, ok := g.mainCache.get(key); ok {
+		log.Println("[GeeCache] hit")
+		return v, nil
+	}
+	return g.load(key)
+}
+
+// 在未命中时候获取缓存
+func (g *Group) load(key string) (value ByteView, err error) {
+	//先只获取本地缓存
+	return g.getLocally(key)
+}
+
+// 从用户设置的回调函数中获取缓存
+func (g *Group) getLocally(key string) (value ByteView, err error) {
+	bytes, err := g.getter.Get(key)
+	if err != nil {
+		return ByteView{}, err
+
+	}
+	value = ByteView{b: cloneBytes(bytes)}
+	g.populateCache(key, value)
+	return value, nil
+}
+
+func (g *Group) populateCache(key string, value ByteView) {
+	g.mainCache.add(key, value)
 }
