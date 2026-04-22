@@ -1,5 +1,5 @@
 // 实例化lru，对其封装一层互斥锁，并用饿汉模式，直到使用时才创建lru
-package cache
+package cachemutex
 
 import (
 	"mycache/byteview"
