@@ -4,13 +4,11 @@ import (
 	"fmt"
 	"io"
 	"log"
+	"mycache/consistenthash"
 	"net/http"
 	"strings"
+	"sync"
 )
-
-/*	HTTP服务端	*/
-
-const defaultBasePath = "/_geecache/"
 
 // self用于记录自己的地址，包括主机名/IP和端口
 // basePath作为节点间通讯地址的前缀
@@ -19,10 +17,46 @@ const defaultBasePath = "/_geecache/"
 加一段 Path 是一个好习惯
 比如，大部分网站的 API 接口，一般以 /api 作为前缀。
 */
+const (
+	defaultBasePath = "/_geecache/"
+	defaultReplicas = 50
+)
+
+// HTTPPool implements PeerPicker for a pool of HTTP peers.
 type HTTPPool struct {
-	self     string
-	basePath string
+	// this peer's base URL, e.g. "https://example.net:8000"
+	self        string
+	basePath    string
+	mutex       sync.Mutex // guards peers and httpGetters
+	peers       *consistenthash.Map
+	httpGetters map[string]*httpGetter // keyed by e.g. "http://10.0.0.2:8008"
 }
+
+func (h *HTTPPool) Set(peers ...string) {
+	h.mutex.Lock()
+	defer h.mutex.Unlock()
+	h.peers = consistenthash.NewMap(defaultReplicas, nil)
+	h.peers.Add(peers...)
+	h.httpGetters = make(map[string]*httpGetter, len(peers))
+	for _, peer := range peers {
+		h.httpGetters[peer] = &httpGetter{
+			baseURL: peer + h.basePath,
+		}
+	}
+}
+
+func (h *HTTPPool) PickPeer(key string) (PeerGetter, bool) {
+	h.mutex.Lock()
+	defer h.mutex.Unlock()
+	peer := h.peers.Get(key)
+	if peer != "" && peer != h.self {
+		h.Log("Pick peer %s", peer)
+		return h.httpGetters[peer], true
+	}
+	return nil, false
+}
+
+var _ PeerPicker = (*HTTPPool)(nil)
 
 func NewHTTPPool(self string) *HTTPPool {
 	return &HTTPPool{
@@ -68,6 +102,11 @@ func (p *HTTPPool) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 }
 
 /*	HTTP客户端	*/
+/*
+这个"客户端"是指单个节点向其他节点请求数据的能力，
+不是指用户端的客户端。
+每个节点都是一个完整的"客户端+服务端"。
+*/
 type httpGetter struct {
 	baseURL string //需要访问的数据的远程节点地址
 }
@@ -79,6 +118,7 @@ func (h *httpGetter) Get(group string, key string) ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
+
 	defer res.Body.Close()
 	if res.StatusCode != http.StatusOK {
 		return nil, fmt.Errorf("server returned:%s", res.Status)
