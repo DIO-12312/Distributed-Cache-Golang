@@ -2,10 +2,13 @@ package mycache
 
 import (
 	"fmt"
+	"io"
 	"log"
 	"net/http"
 	"strings"
 )
+
+/*	HTTP服务端	*/
 
 const defaultBasePath = "/_geecache/"
 
@@ -63,3 +66,31 @@ func (p *HTTPPool) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/octet-stream")
 	w.Write(value.ByteSlices())
 }
+
+/*	HTTP客户端	*/
+type httpGetter struct {
+	baseURL string //需要访问的数据的远程节点地址
+}
+
+// 访问标定格式的地址，获取响应体的数据
+func (h *httpGetter) Get(group string, key string) ([]byte, error) {
+	u := fmt.Sprintf("%s%s/%s", h.baseURL, group, key)
+	res, err := http.Get(u)
+	if err != nil {
+		return nil, err
+	}
+	defer res.Body.Close()
+	if res.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("server returned:%s", res.Status)
+	}
+	//ioutil.ReadAll在1.16版本已被弃用
+	bytes, err := io.ReadAll(res.Body)
+	if err != nil {
+		return nil, fmt.Errorf("reading response body: %v", err)
+	}
+	return bytes, nil
+
+}
+
+// Go语言编译时检查接口的常用语句，检查特定类型是否真的实现了接口
+var _ PeerGetter = (*httpGetter)(nil)

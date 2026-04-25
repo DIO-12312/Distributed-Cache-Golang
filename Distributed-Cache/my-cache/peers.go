@@ -9,5 +9,3 @@ type PeerPicker interface {
 type PeerGetter interface {
 	Get(group string, key string) ([]byte, error)
 }
-
-//可以分别改进选择策略和通信方式 ，降低耦合性
