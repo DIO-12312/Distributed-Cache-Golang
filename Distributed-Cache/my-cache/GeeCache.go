@@ -1,8 +1,7 @@
-// 这是 Go 的惯例：模块根目录下的 .go 文件，package名通常和模块名保持一致。
+// 这是 Go 的惯例：模块目录下的 .go 文件，package名通常和模块名保持一致。
 package mycache
 
 import (
-	"errors"
 	"fmt"
 	"log"
 	"sync"
@@ -43,6 +42,7 @@ type Group struct {
 	name      string //每个group都有自己的命名空间
 	mainCache cache
 	getter    Getter
+	peers     PeerPicker
 }
 
 var (
@@ -52,9 +52,9 @@ var (
 	groups = make(map[string]*Group) //指针确保能修改到真实对象
 )
 
-func NewGroup(name string, cacheBytes int64, getter Getter) (*Group, error) {
+func NewGroup(name string, cacheBytes int64, getter Getter) *Group {
 	if getter == nil {
-		return nil, errors.New("No nil getter")
+		return nil
 	}
 	mutex.Lock()
 	defer mutex.Unlock()
@@ -64,7 +64,7 @@ func NewGroup(name string, cacheBytes int64, getter Getter) (*Group, error) {
 		getter:    getter,
 	}
 	groups[name] = g
-	return g, nil
+	return g
 }
 
 func GetGroup(name string) (*Group, bool) {
@@ -88,10 +88,32 @@ func (g *Group) Get(key string) (value ByteView, err error) {
 	return g.load(key)
 }
 
-// 在未命中时候获取缓存
+func (g *Group) RegisterPeers(peers PeerPicker) {
+	if g.peers != nil {
+		panic("RegisterPeerPicker called more than once")
+	}
+	g.peers = peers
+}
+
+// 在未命中时候从内存中获取缓存
 func (g *Group) load(key string) (value ByteView, err error) {
-	//先只获取本地缓存
+	if g.peers != nil {
+		if peer, ok := g.peers.PickPeer(key); ok {
+			if value, err := g.getFromPeer(peer, key); err == nil {
+				return value, nil
+			}
+			log.Println("[GeeCache] Failed to get from peer", err)
+		}
+	}
 	return g.getLocally(key)
+}
+
+func (g *Group) getFromPeer(peer PeerGetter, key string) (ByteView, error) {
+	bytes, err := peer.Get(g.name, key)
+	if err != nil {
+		return ByteView{}, err
+	}
+	return ByteView{b: bytes}, nil
 }
 
 // 从用户设置的回调函数中获取缓存
