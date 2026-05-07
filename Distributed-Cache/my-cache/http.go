@@ -112,6 +112,7 @@ type httpGetter struct {
 }
 
 // 访问标定格式的地址，获取响应体的数据
+// go语言传输形式为原始字节流，本身没有任何格式
 func (h *httpGetter) Get(group string, key string) ([]byte, error) {
 	u := fmt.Sprintf("%s%s/%s", h.baseURL, group, key)
 	res, err := http.Get(u)
